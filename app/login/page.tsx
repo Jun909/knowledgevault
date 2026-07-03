@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import Workspace from "@/components/Workspace";
+import LoginForm from "./LoginForm";
 
-export default async function Home() {
+export default async function LoginPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (user) redirect("/");
 
-  return <Workspace userId={user.id} userEmail={user.email ?? ""} />;
+  return <LoginForm />;
 }
