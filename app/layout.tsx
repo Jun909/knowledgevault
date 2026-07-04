@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KnowledgeVault",
+  title: "Knowledge Vault",
   description: "Internal notes",
 };
 
