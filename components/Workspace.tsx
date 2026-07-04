@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { positionBetween } from "@/lib/position";
 import type { Folder, Note } from "@/lib/types";
 import Sidebar from "./Sidebar";
+import ThemeToggle from "./ThemeToggle";
 
 // The realtime row for a note includes columns (content, doc_state) that the
 // sidebar's Note type deliberately excludes — narrow to just what we keep in state.
@@ -14,11 +16,14 @@ function toNoteSummary(row: Note & { content?: unknown; doc_state?: string | nul
     id: row.id,
     folder_id: row.folder_id,
     title: row.title,
+    position: row.position,
     created_by: row.created_by,
     last_edited_by: row.last_edited_by,
     updated_at: row.updated_at,
   };
 }
+
+const NOTE_COLUMNS = "id, folder_id, title, position, created_by, last_edited_by, updated_at";
 
 const NoteEditor = dynamic(() => import("./NoteEditor"), { ssr: false });
 
@@ -58,11 +63,8 @@ export default function Workspace({
 
   const loadData = useCallback(async () => {
     const [{ data: folderData }, { data: noteData }] = await Promise.all([
-      supabase.from("folders").select("*").order("name"),
-      supabase
-        .from("notes")
-        .select("id, folder_id, title, created_by, last_edited_by, updated_at")
-        .order("updated_at", { ascending: false }),
+      supabase.from("folders").select("*").order("position"),
+      supabase.from("notes").select(NOTE_COLUMNS).order("position"),
     ]);
     setFolders(folderData ?? []);
     setNotes(noteData ?? []);
@@ -130,9 +132,14 @@ export default function Workspace({
   async function handleCreateFolder(parentId: string | null) {
     const name = prompt("Folder name")?.trim();
     if (!name) return;
+    const siblings = folders.filter((f) => f.parent_id === parentId);
+    const position = positionBetween(
+      siblings.length ? Math.max(...siblings.map((f) => f.position)) : null,
+      null
+    );
     const { data, error } = await supabase
       .from("folders")
-      .insert({ name, parent_id: parentId })
+      .insert({ name, parent_id: parentId, position })
       .select()
       .single();
     if (!error && data) setFolders((prev) => [...prev, data]);
@@ -150,11 +157,23 @@ export default function Workspace({
     selectNote(null);
   }
 
+  async function handleMoveFolder(id: string, parentId: string | null, position: number) {
+    setFolders((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, parent_id: parentId, position } : f))
+    );
+    await supabase.from("folders").update({ parent_id: parentId, position }).eq("id", id);
+  }
+
   async function handleCreateNote(folderId: string | null) {
+    const siblings = notes.filter((n) => n.folder_id === folderId);
+    const position = positionBetween(
+      siblings.length ? Math.max(...siblings.map((n) => n.position)) : null,
+      null
+    );
     const { data, error } = await supabase
       .from("notes")
-      .insert({ folder_id: folderId, title: "Untitled", content: [], created_by: userId })
-      .select("id, folder_id, title, created_by, last_edited_by, updated_at")
+      .insert({ folder_id: folderId, title: "Untitled", content: [], created_by: userId, position })
+      .select(NOTE_COLUMNS)
       .single();
     if (!error && data) {
       setNotes((prev) => [data, ...prev]);
@@ -171,6 +190,13 @@ export default function Workspace({
     setNotes((prev) => prev.filter((n) => n.id !== id));
     if (selectedNoteId === id) selectNote(null);
     await supabase.from("notes").delete().eq("id", id);
+  }
+
+  async function handleMoveNote(id: string, folderId: string | null, position: number) {
+    setNotes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, folder_id: folderId, position } : n))
+    );
+    await supabase.from("notes").update({ folder_id: folderId, position }).eq("id", id);
   }
 
   async function handleSignOut() {
@@ -205,13 +231,16 @@ export default function Workspace({
         onCreateFolder={handleCreateFolder}
         onRenameFolder={handleRenameFolder}
         onDeleteFolder={handleDeleteFolder}
+        onMoveFolder={handleMoveFolder}
         onCreateNote={handleCreateNote}
         onRenameNote={handleRenameNote}
         onDeleteNote={handleDeleteNote}
+        onMoveNote={handleMoveNote}
       />
       <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-end border-b border-zinc-200 px-4 py-2 text-xs text-zinc-500 dark:border-zinc-800">
-          <span className="mr-3">{userEmail}</span>
+        <div className="flex items-center justify-end gap-3 border-b border-zinc-200 px-4 py-2 text-xs text-zinc-500 dark:border-zinc-800">
+          <ThemeToggle />
+          <span>{userEmail}</span>
           <button
             onClick={handleSignOut}
             className="hover:text-zinc-900 dark:hover:text-zinc-100"
