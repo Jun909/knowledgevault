@@ -18,6 +18,11 @@ create table if not exists notes (
 
 alter table notes add column if not exists last_edited_by text;
 
+-- Base64-encoded Yjs doc snapshot (Y.encodeStateAsUpdate), used for live
+-- collaborative editing. Null until a note is first opened after this
+-- column was added, at which point it's seeded from `content`.
+alter table notes add column if not exists doc_state text;
+
 create index if not exists folders_parent_id_idx on folders(parent_id);
 create index if not exists notes_folder_id_idx on notes(folder_id);
 

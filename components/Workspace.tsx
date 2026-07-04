@@ -46,7 +46,10 @@ export default function Workspace({
   const loadData = useCallback(async () => {
     const [{ data: folderData }, { data: noteData }] = await Promise.all([
       supabase.from("folders").select("*").order("name"),
-      supabase.from("notes").select("*").order("updated_at", { ascending: false }),
+      supabase
+        .from("notes")
+        .select("id, folder_id, title, created_by, last_edited_by, updated_at")
+        .order("updated_at", { ascending: false }),
     ]);
     setFolders(folderData ?? []);
     setNotes(noteData ?? []);
@@ -84,7 +87,7 @@ export default function Workspace({
     const { data, error } = await supabase
       .from("notes")
       .insert({ folder_id: folderId, title: "Untitled", content: [], created_by: userId })
-      .select()
+      .select("id, folder_id, title, created_by, last_edited_by, updated_at")
       .single();
     if (!error && data) {
       setNotes((prev) => [data, ...prev]);
