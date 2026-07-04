@@ -4,18 +4,16 @@ import "@blocknote/core/fonts/inter.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
-import type { Block, PartialBlock } from "@blocknote/core";
+import * as Y from "yjs";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Note } from "@/lib/types";
+import type { Note, NoteContent } from "@/lib/types";
+import { getFragment, loadYDoc, stringToColor } from "@/lib/collab";
+import { useNoteCollaboration } from "@/lib/useNoteCollaboration";
 
 const supabase = createClient();
 
-function asBlocks(content: unknown): PartialBlock[] {
-  return Array.isArray(content) && content.length > 0
-    ? (content as PartialBlock[])
-    : [{ type: "paragraph", content: "" }];
-}
+type SavedInfo = { lastEditedBy: string; updatedAt: string };
 
 export default function NoteEditor({
   note,
@@ -26,33 +24,102 @@ export default function NoteEditor({
   note: Note;
   userEmail: string;
   onTitleChange: (title: string) => void;
-  onSaved: (info: { lastEditedBy: string; updatedAt: string }) => void;
+  onSaved: (info: SavedInfo) => void;
 }) {
-  const editor = useCreateBlockNote({ initialContent: asBlocks(note.content) });
+  const [doc, setDoc] = useState<Y.Doc | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    supabase
+      .from("notes")
+      .select("content, doc_state")
+      .eq("id", note.id)
+      .single()
+      .then(({ data }: { data: NoteContent | null }) => {
+        if (cancelled) return;
+        setDoc(
+          loadYDoc({
+            content: data?.content ?? [],
+            docState: data?.doc_state ?? null,
+          })
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [note.id]);
+
+  if (!doc) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">
+        Loading note…
+      </div>
+    );
+  }
+
+  return (
+    <NoteEditorBody
+      note={note}
+      doc={doc}
+      userEmail={userEmail}
+      onTitleChange={onTitleChange}
+      onSaved={onSaved}
+    />
+  );
+}
+
+function NoteEditorBody({
+  note,
+  doc,
+  userEmail,
+  onTitleChange,
+  onSaved,
+}: {
+  note: Note;
+  doc: Y.Doc;
+  userEmail: string;
+  onTitleChange: (title: string) => void;
+  onSaved: (info: SavedInfo) => void;
+}) {
   const [title, setTitle] = useState(note.title);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [lastEditedBy, setLastEditedBy] = useState(note.last_edited_by);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    setTitle(note.title);
-    setLastEditedBy(note.last_edited_by);
-    setSavedAt(null);
+  function handleSaved(info: SavedInfo) {
     setSaveError(null);
-    editor.replaceBlocks(editor.document, asBlocks(note.content));
-    // Only re-sync when switching to a different note.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note.id]);
+    setSavedAt(new Date(info.updatedAt));
+    setLastEditedBy(info.lastEditedBy);
+    onSaved(info);
+  }
 
-  function scheduleSave(blocks: Block[], titleValue: string) {
-    if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(async () => {
+  const { awareness } = useNoteCollaboration({
+    supabase,
+    noteId: note.id,
+    userEmail,
+    doc,
+    onSaved: handleSaved,
+    onError: setSaveError,
+  });
+
+  const editor = useCreateBlockNote({
+    collaboration: {
+      fragment: getFragment(doc),
+      user: { name: userEmail, color: stringToColor(userEmail) },
+      provider: { awareness },
+    },
+  });
+
+  function scheduleTitleSave(titleValue: string) {
+    if (titleSaveTimeout.current) clearTimeout(titleSaveTimeout.current);
+    titleSaveTimeout.current = setTimeout(async () => {
       const updatedAt = new Date().toISOString();
       const { error } = await supabase
         .from("notes")
         .update({
-          content: blocks,
           title: titleValue,
           last_edited_by: userEmail,
           updated_at: updatedAt,
@@ -63,11 +130,7 @@ export default function NoteEditor({
         setSaveError(error.message);
         return;
       }
-
-      setSaveError(null);
-      setSavedAt(new Date());
-      setLastEditedBy(userEmail);
-      onSaved({ lastEditedBy: userEmail, updatedAt });
+      handleSaved({ lastEditedBy: userEmail, updatedAt });
     }, 600);
   }
 
@@ -79,7 +142,7 @@ export default function NoteEditor({
           onChange={(e) => {
             setTitle(e.target.value);
             onTitleChange(e.target.value);
-            scheduleSave(editor.document, e.target.value);
+            scheduleTitleSave(e.target.value);
           }}
           placeholder="Untitled"
           className="w-full bg-transparent text-2xl font-semibold text-zinc-900 outline-none dark:text-zinc-50"
@@ -99,11 +162,7 @@ export default function NoteEditor({
         )}
       </div>
       <div className="flex-1 px-2 py-4">
-        <BlockNoteView
-          editor={editor}
-          onChange={() => scheduleSave(editor.document, title)}
-          portalElements={{ default: null }}
-        />
+        <BlockNoteView editor={editor} portalElements={{ default: null }} />
       </div>
     </div>
   );

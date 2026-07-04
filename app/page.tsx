@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Workspace from "@/components/Workspace";
@@ -10,5 +11,9 @@ export default async function Home() {
 
   if (!user) redirect("/login");
 
-  return <Workspace userId={user.id} userEmail={user.email ?? ""} />;
+  return (
+    <Suspense>
+      <Workspace userId={user.id} userEmail={user.email ?? ""} />
+    </Suspense>
+  );
 }

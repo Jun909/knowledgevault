@@ -182,7 +182,7 @@ function FolderNode({
             📁 {folder.name}
           </span>
         )}
-        <div className="hidden shrink-0 gap-1 group-hover:flex">
+        <div className="flex shrink-0 gap-1 sm:hidden sm:group-hover:flex">
           <button
             title="New note"
             onClick={() => handlers.onCreateNote(folder.id)}
@@ -290,7 +290,7 @@ function NoteRow({
         onClick={() => {
           if (confirm(`Delete "${note.title}"?`)) onDeleteNote(note.id);
         }}
-        className="hidden shrink-0 text-xs text-zinc-500 hover:text-red-600 group-hover:block"
+        className="block shrink-0 text-xs text-zinc-500 hover:text-red-600 sm:hidden sm:group-hover:block"
       >
         🗑
       </button>
