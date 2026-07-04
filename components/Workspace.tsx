@@ -1,11 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Note } from "@/lib/types";
 import Sidebar from "./Sidebar";
+
+// The realtime row for a note includes columns (content, doc_state) that the
+// sidebar's Note type deliberately excludes — narrow to just what we keep in state.
+function toNoteSummary(row: Note & { content?: unknown; doc_state?: string | null }): Note {
+  return {
+    id: row.id,
+    folder_id: row.folder_id,
+    title: row.title,
+    created_by: row.created_by,
+    last_edited_by: row.last_edited_by,
+    updated_at: row.updated_at,
+  };
+}
 
 const NoteEditor = dynamic(() => import("./NoteEditor"), { ssr: false });
 
@@ -59,6 +72,60 @@ export default function Workspace({
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Kept fresh after every render so the realtime subscription below (which
+  // mounts once) can always act on the latest selection without resubscribing.
+  const selectedNoteIdRef = useRef(selectedNoteId);
+  const selectNoteRef = useRef(selectNote);
+  useEffect(() => {
+    selectedNoteIdRef.current = selectedNoteId;
+    selectNoteRef.current = selectNote;
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("workspace-changes")
+      .on<Folder>(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "folders" },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const id = payload.old.id;
+            setFolders((prev) => prev.filter((f) => f.id !== id));
+          } else {
+            const folder = payload.new;
+            setFolders((prev) =>
+              prev.some((f) => f.id === folder.id)
+                ? prev.map((f) => (f.id === folder.id ? folder : f))
+                : [...prev, folder]
+            );
+          }
+        }
+      )
+      .on<Note & { content?: unknown; doc_state?: string | null }>(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notes" },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const id = payload.old.id;
+            setNotes((prev) => prev.filter((n) => n.id !== id));
+            if (selectedNoteIdRef.current === id) selectNoteRef.current(null);
+          } else {
+            const note = toNoteSummary(payload.new);
+            setNotes((prev) =>
+              prev.some((n) => n.id === note.id)
+                ? prev.map((n) => (n.id === note.id ? note : n))
+                : [note, ...prev]
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   async function handleCreateFolder(parentId: string | null) {
     const name = prompt("Folder name")?.trim();

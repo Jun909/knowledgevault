@@ -42,3 +42,22 @@ create policy "authenticated read/write notes"
   to authenticated
   using (true)
   with check (true);
+
+-- Realtime (Postgres Changes) so the sidebar's folder/note list updates live
+-- across clients instead of requiring a refresh. Safe to re-run: skips
+-- tables already in the publication.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'folders'
+  ) then
+    alter publication supabase_realtime add table folders;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'notes'
+  ) then
+    alter publication supabase_realtime add table notes;
+  end if;
+end $$;
