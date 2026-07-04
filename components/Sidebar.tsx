@@ -20,8 +20,23 @@ type Props = Handlers & {
 };
 
 export default function Sidebar({ folders, notes, ...handlers }: Props) {
+  const [collapsed, setCollapsed] = useState(false);
   const rootFolders = folders.filter((f) => f.parent_id === null);
   const rootNotes = notes.filter((n) => n.folder_id === null);
+
+  if (collapsed) {
+    return (
+      <aside className="flex w-10 shrink-0 flex-col items-center border-r border-zinc-200 bg-zinc-50 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+        <button
+          title="Expand sidebar"
+          onClick={() => setCollapsed(false)}
+          className="rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        >
+          »
+        </button>
+      </aside>
+    );
+  }
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950">
@@ -29,12 +44,21 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
         <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
           Notes
         </span>
-        <button
-          onClick={() => handlers.onCreateFolder(null)}
-          className="rounded px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
-        >
-          + Folder
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => handlers.onCreateFolder(null)}
+            className="rounded px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            + Folder
+          </button>
+          <button
+            title="Collapse sidebar"
+            onClick={() => setCollapsed(true)}
+            className="rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            «
+          </button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-2">
         {rootFolders.map((folder) => (
