@@ -17,14 +17,27 @@ function asBlocks(content: unknown): PartialBlock[] {
     : [{ type: "paragraph", content: "" }];
 }
 
-export default function NoteEditor({ note }: { note: Note }) {
+export default function NoteEditor({
+  note,
+  userEmail,
+  onTitleChange,
+  onSaved,
+}: {
+  note: Note;
+  userEmail: string;
+  onTitleChange: (title: string) => void;
+  onSaved: (info: { lastEditedBy: string; updatedAt: string }) => void;
+}) {
   const editor = useCreateBlockNote({ initialContent: asBlocks(note.content) });
   const [title, setTitle] = useState(note.title);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [lastEditedBy, setLastEditedBy] = useState(note.last_edited_by);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setTitle(note.title);
+    setLastEditedBy(note.last_edited_by);
+    setSavedAt(null);
     editor.replaceBlocks(editor.document, asBlocks(note.content));
     // Only re-sync when switching to a different note.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -33,15 +46,19 @@ export default function NoteEditor({ note }: { note: Note }) {
   function scheduleSave(blocks: Block[], titleValue: string) {
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(async () => {
+      const updatedAt = new Date().toISOString();
       await supabase
         .from("notes")
         .update({
           content: blocks,
           title: titleValue,
-          updated_at: new Date().toISOString(),
+          last_edited_by: userEmail,
+          updated_at: updatedAt,
         })
         .eq("id", note.id);
       setSavedAt(new Date());
+      setLastEditedBy(userEmail);
+      onSaved({ lastEditedBy: userEmail, updatedAt });
     }, 600);
   }
 
@@ -52,14 +69,17 @@ export default function NoteEditor({ note }: { note: Note }) {
           value={title}
           onChange={(e) => {
             setTitle(e.target.value);
+            onTitleChange(e.target.value);
             scheduleSave(editor.document, e.target.value);
           }}
           placeholder="Untitled"
           className="w-full bg-transparent text-2xl font-semibold text-zinc-900 outline-none dark:text-zinc-50"
         />
-        {savedAt && (
+        {(lastEditedBy || savedAt) && (
           <p className="mt-1 text-xs text-zinc-400">
-            Saved {savedAt.toLocaleTimeString()}
+            {lastEditedBy && <>Last edited by {lastEditedBy}</>}
+            {lastEditedBy && savedAt && " · "}
+            {savedAt && <>Saved {savedAt.toLocaleTimeString()}</>}
           </p>
         )}
       </div>
