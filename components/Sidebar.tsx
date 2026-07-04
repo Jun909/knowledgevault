@@ -21,67 +21,108 @@ type Props = Handlers & {
 
 export default function Sidebar({ folders, notes, ...handlers }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const rootFolders = folders.filter((f) => f.parent_id === null);
   const rootNotes = notes.filter((n) => n.folder_id === null);
 
-  if (collapsed) {
-    return (
-      <aside className="flex w-10 shrink-0 flex-col items-center border-r border-zinc-200 bg-zinc-50 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-        <button
-          title="Expand sidebar"
-          onClick={() => setCollapsed(false)}
-          className="rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
-        >
-          »
-        </button>
-      </aside>
-    );
-  }
+  const selectNoteAndClose = (id: string) => {
+    handlers.onSelectNote(id);
+    setMobileOpen(false);
+  };
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="flex items-center justify-between border-b border-zinc-200 p-3 dark:border-zinc-800">
-        <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-          Notes
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => handlers.onCreateFolder(null)}
-            className="rounded px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            + Folder
-          </button>
-          <button
-            title="Collapse sidebar"
-            onClick={() => setCollapsed(true)}
-            className="rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            «
-          </button>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-2">
-        {rootFolders.map((folder) => (
-          <FolderNode
-            key={folder.id}
-            folder={folder}
-            depth={0}
-            folders={folders}
-            notes={notes}
-            {...handlers}
-          />
-        ))}
-        {rootNotes.map((note) => (
-          <NoteRow key={note.id} note={note} depth={0} {...handlers} />
-        ))}
+    <>
+      {!mobileOpen && (
         <button
-          onClick={() => handlers.onCreateNote(null)}
-          className="mt-1 w-full rounded px-2 py-1 text-left text-xs text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+          title="Open sidebar"
+          onClick={() => setMobileOpen(true)}
+          className="fixed left-3 top-3 z-30 rounded bg-zinc-50 p-2 text-lg leading-none text-zinc-600 shadow dark:bg-zinc-900 dark:text-zinc-400 sm:hidden"
         >
-          + New note
+          ☰
         </button>
-      </div>
-    </aside>
+      )}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 z-30 bg-black/40 sm:hidden"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-zinc-200 bg-zinc-50 transition-transform duration-200 dark:border-zinc-800 dark:bg-zinc-950 sm:static sm:z-auto sm:shrink-0 sm:translate-x-0 sm:transition-[width] ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        } ${collapsed ? "sm:w-10" : "sm:w-72"}`}
+      >
+        {collapsed ? (
+          <div className="hidden sm:flex sm:flex-col sm:items-center sm:py-3">
+            <button
+              title="Expand sidebar"
+              onClick={() => setCollapsed(false)}
+              className="rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              »
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between border-b border-zinc-200 p-3 dark:border-zinc-800">
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                Notes
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handlers.onCreateFolder(null)}
+                  className="rounded px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  + Folder
+                </button>
+                <button
+                  title="Collapse sidebar"
+                  onClick={() => setCollapsed(true)}
+                  className="hidden rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 sm:inline-flex"
+                >
+                  «
+                </button>
+                <button
+                  title="Close sidebar"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 sm:hidden"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {rootFolders.map((folder) => (
+                <FolderNode
+                  key={folder.id}
+                  folder={folder}
+                  depth={0}
+                  folders={folders}
+                  notes={notes}
+                  {...handlers}
+                  onSelectNote={selectNoteAndClose}
+                />
+              ))}
+              {rootNotes.map((note) => (
+                <NoteRow
+                  key={note.id}
+                  note={note}
+                  depth={0}
+                  {...handlers}
+                  onSelectNote={selectNoteAndClose}
+                />
+              ))}
+              <button
+                onClick={() => handlers.onCreateNote(null)}
+                className="mt-1 w-full rounded px-2 py-1 text-left text-xs text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+              >
+                + New note
+              </button>
+            </div>
+          </>
+        )}
+      </aside>
+    </>
   );
 }
 
