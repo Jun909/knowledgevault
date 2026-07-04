@@ -87,6 +87,7 @@ export default function NoteEditor({
         <BlockNoteView
           editor={editor}
           onChange={() => scheduleSave(editor.document, title)}
+          portalElements={{ default: null }}
         />
       </div>
     </div>
