@@ -122,7 +122,25 @@ export default function Workspace({
           </button>
         </div>
         {selectedNote ? (
-          <NoteEditor key={selectedNote.id} note={selectedNote} />
+          <NoteEditor
+            key={selectedNote.id}
+            note={selectedNote}
+            userEmail={userEmail}
+            onTitleChange={(title) =>
+              setNotes((prev) =>
+                prev.map((n) => (n.id === selectedNote.id ? { ...n, title } : n))
+              )
+            }
+            onSaved={({ lastEditedBy, updatedAt }) =>
+              setNotes((prev) =>
+                prev.map((n) =>
+                  n.id === selectedNote.id
+                    ? { ...n, last_edited_by: lastEditedBy, updated_at: updatedAt }
+                    : n
+                )
+              )
+            }
+          />
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">
             Select or create a note

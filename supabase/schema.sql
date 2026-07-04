@@ -16,6 +16,8 @@ create table if not exists notes (
   updated_at timestamptz not null default now()
 );
 
+alter table notes add column if not exists last_edited_by text;
+
 create index if not exists folders_parent_id_idx on folders(parent_id);
 create index if not exists notes_folder_id_idx on notes(folder_id);
 

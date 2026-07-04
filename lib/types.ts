@@ -11,5 +11,6 @@ export type Note = {
   title: string;
   content: unknown;
   created_by: string | null;
+  last_edited_by: string | null;
   updated_at: string;
 };
