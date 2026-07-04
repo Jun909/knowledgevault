@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { positionBetween } from "@/lib/position";
 import type { Folder, Note } from "@/lib/types";
 
 type Handlers = {
@@ -9,9 +10,11 @@ type Handlers = {
   onCreateFolder: (parentId: string | null) => void;
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
+  onMoveFolder: (id: string, parentId: string | null, position: number) => void;
   onCreateNote: (folderId: string | null) => void;
   onRenameNote: (id: string, title: string) => void;
   onDeleteNote: (id: string) => void;
+  onMoveNote: (id: string, folderId: string | null, position: number) => void;
 };
 
 type Props = Handlers & {
@@ -19,15 +22,158 @@ type Props = Handlers & {
   notes: Note[];
 };
 
+type DropZone = "before" | "after" | "inside";
+
+type DndBundle = {
+  dragging: { kind: "folder" | "note"; id: string } | null;
+  dropTarget: { id: string; zone: DropZone } | null;
+  onDragStart: (e: React.DragEvent, kind: "folder" | "note", id: string) => void;
+  onDragEnd: () => void;
+  onFolderDragOver: (e: React.DragEvent, target: Folder) => void;
+  onFolderDrop: (e: React.DragEvent, target: Folder) => void;
+  onNoteDragOver: (e: React.DragEvent, target: Note) => void;
+  onNoteDrop: (e: React.DragEvent, target: Note) => void;
+  onDragLeave: (id: string) => void;
+};
+
+function isDescendant(folders: Folder[], ancestorId: string, nodeId: string): boolean {
+  let current = folders.find((f) => f.id === nodeId);
+  while (current?.parent_id) {
+    if (current.parent_id === ancestorId) return true;
+    current = folders.find((f) => f.id === current!.parent_id);
+  }
+  return false;
+}
+
+function getDropZone(e: React.DragEvent, allowInside: boolean): DropZone {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  const ratio = (e.clientY - rect.top) / rect.height;
+  if (allowInside) {
+    if (ratio < 0.25) return "before";
+    if (ratio > 0.75) return "after";
+    return "inside";
+  }
+  return ratio < 0.5 ? "before" : "after";
+}
+
 export default function Sidebar({ folders, notes, ...handlers }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const rootFolders = folders.filter((f) => f.parent_id === null);
-  const rootNotes = notes.filter((n) => n.folder_id === null);
+  const [dragging, setDragging] = useState<{ kind: "folder" | "note"; id: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; zone: DropZone } | null>(null);
+
+  const rootFolders = folders.filter((f) => f.parent_id === null).sort((a, b) => a.position - b.position);
+  const rootNotes = notes.filter((n) => n.folder_id === null).sort((a, b) => a.position - b.position);
 
   const selectNoteAndClose = (id: string) => {
     handlers.onSelectNote(id);
     setMobileOpen(false);
+  };
+
+  function moveFolderRelative(draggedId: string, target: Folder, zone: DropZone) {
+    if (draggedId === target.id) return;
+    if (zone === "inside") {
+      if (isDescendant(folders, draggedId, target.id)) return;
+      const siblings = folders
+        .filter((f) => f.parent_id === target.id && f.id !== draggedId)
+        .sort((a, b) => a.position - b.position);
+      handlers.onMoveFolder(draggedId, target.id, positionBetween(siblings.at(-1)?.position ?? null, null));
+      return;
+    }
+    const newParentId = target.parent_id;
+    if (newParentId != null && (newParentId === draggedId || isDescendant(folders, draggedId, newParentId))) return;
+    const siblings = folders
+      .filter((f) => f.parent_id === newParentId && f.id !== draggedId)
+      .sort((a, b) => a.position - b.position);
+    const index = siblings.findIndex((f) => f.id === target.id);
+    const position =
+      zone === "before"
+        ? positionBetween(siblings[index - 1]?.position ?? null, target.position)
+        : positionBetween(target.position, siblings[index + 1]?.position ?? null);
+    handlers.onMoveFolder(draggedId, newParentId, position);
+  }
+
+  function moveNoteIntoFolder(draggedId: string, folderId: string) {
+    const siblings = notes.filter((n) => n.folder_id === folderId).sort((a, b) => a.position - b.position);
+    handlers.onMoveNote(draggedId, folderId, positionBetween(siblings.at(-1)?.position ?? null, null));
+  }
+
+  function moveNoteRelative(draggedId: string, target: Note, zone: "before" | "after") {
+    if (draggedId === target.id) return;
+    const newFolderId = target.folder_id;
+    const siblings = notes
+      .filter((n) => n.folder_id === newFolderId && n.id !== draggedId)
+      .sort((a, b) => a.position - b.position);
+    const index = siblings.findIndex((n) => n.id === target.id);
+    const position =
+      zone === "before"
+        ? positionBetween(siblings[index - 1]?.position ?? null, target.position)
+        : positionBetween(target.position, siblings[index + 1]?.position ?? null);
+    handlers.onMoveNote(draggedId, newFolderId, position);
+  }
+
+  function moveToRoot() {
+    if (!dragging) return;
+    if (dragging.kind === "folder") {
+      const siblings = folders.filter((f) => f.parent_id === null && f.id !== dragging.id).sort((a, b) => a.position - b.position);
+      handlers.onMoveFolder(dragging.id, null, positionBetween(siblings.at(-1)?.position ?? null, null));
+    } else {
+      const siblings = notes.filter((n) => n.folder_id === null && n.id !== dragging.id).sort((a, b) => a.position - b.position);
+      handlers.onMoveNote(dragging.id, null, positionBetween(siblings.at(-1)?.position ?? null, null));
+    }
+  }
+
+  const dnd: DndBundle = {
+    dragging,
+    dropTarget,
+    onDragStart: (e, kind, id) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", id);
+      setDragging({ kind, id });
+    },
+    onDragEnd: () => {
+      setDragging(null);
+      setDropTarget(null);
+    },
+    onFolderDragOver: (e, target) => {
+      if (!dragging) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const zone = dragging.kind === "note" ? "inside" : getDropZone(e, true);
+      setDropTarget({ id: target.id, zone });
+    },
+    onFolderDrop: (e, target) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dragging) {
+        if (dragging.kind === "note") {
+          moveNoteIntoFolder(dragging.id, target.id);
+        } else {
+          moveFolderRelative(dragging.id, target, getDropZone(e, true));
+        }
+      }
+      setDragging(null);
+      setDropTarget(null);
+    },
+    onNoteDragOver: (e, target) => {
+      if (!dragging || dragging.kind !== "note") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDropTarget({ id: target.id, zone: getDropZone(e, false) });
+    },
+    onNoteDrop: (e, target) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dragging?.kind === "note") {
+        moveNoteRelative(dragging.id, target, getDropZone(e, false) as "before" | "after");
+      }
+      setDragging(null);
+      setDropTarget(null);
+    },
+    onDragLeave: (id) => {
+      setDropTarget((prev) => (prev?.id === id ? null : prev));
+    },
   };
 
   return (
@@ -91,7 +237,19 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-2">
+            <div
+              className="flex-1 overflow-y-auto p-2"
+              onDragOver={(e) => {
+                if (!dragging) return;
+                e.preventDefault();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                moveToRoot();
+                setDragging(null);
+                setDropTarget(null);
+              }}
+            >
               {rootFolders.map((folder) => (
                 <FolderNode
                   key={folder.id}
@@ -99,6 +257,7 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
                   depth={0}
                   folders={folders}
                   notes={notes}
+                  dnd={dnd}
                   {...handlers}
                   onSelectNote={selectNoteAndClose}
                 />
@@ -108,6 +267,7 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
                   key={note.id}
                   note={note}
                   depth={0}
+                  dnd={dnd}
                   {...handlers}
                   onSelectNote={selectNoteAndClose}
                 />
@@ -131,14 +291,15 @@ function FolderNode({
   depth,
   folders,
   notes,
+  dnd,
   ...handlers
-}: Handlers & { folder: Folder; depth: number; folders: Folder[]; notes: Note[] }) {
+}: Handlers & { folder: Folder; depth: number; folders: Folder[]; notes: Note[]; dnd: DndBundle }) {
   const [open, setOpen] = useState(true);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(folder.name);
 
-  const children = folders.filter((f) => f.parent_id === folder.id);
-  const childNotes = notes.filter((n) => n.folder_id === folder.id);
+  const children = folders.filter((f) => f.parent_id === folder.id).sort((a, b) => a.position - b.position);
+  const childNotes = notes.filter((n) => n.folder_id === folder.id).sort((a, b) => a.position - b.position);
 
   function saveName() {
     setEditing(false);
@@ -150,9 +311,24 @@ function FolderNode({
     }
   }
 
+  const isDragging = dnd.dragging?.kind === "folder" && dnd.dragging.id === folder.id;
+  const drop = dnd.dropTarget?.id === folder.id ? dnd.dropTarget.zone : null;
+
   return (
     <div style={{ paddingLeft: depth * 12 }}>
-      <div className="group flex items-center gap-1 rounded px-1 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800">
+      <div
+        draggable={!editing}
+        onDragStart={(e) => dnd.onDragStart(e, "folder", folder.id)}
+        onDragEnd={dnd.onDragEnd}
+        onDragOver={(e) => dnd.onFolderDragOver(e, folder)}
+        onDragLeave={() => dnd.onDragLeave(folder.id)}
+        onDrop={(e) => dnd.onFolderDrop(e, folder)}
+        className={`group flex items-center gap-1 rounded px-1 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 ${
+          isDragging ? "opacity-40" : ""
+        } ${drop === "inside" ? "bg-blue-100 dark:bg-blue-900/40" : ""} ${
+          drop === "before" ? "border-t-2 border-blue-500" : ""
+        } ${drop === "after" ? "border-b-2 border-blue-500" : ""}`}
+      >
         <button
           onClick={() => setOpen(!open)}
           className="w-4 shrink-0 text-xs text-zinc-500"
@@ -219,11 +395,12 @@ function FolderNode({
               depth={depth + 1}
               folders={folders}
               notes={notes}
+              dnd={dnd}
               {...handlers}
             />
           ))}
           {childNotes.map((note) => (
-            <NoteRow key={note.id} note={note} depth={depth + 1} {...handlers} />
+            <NoteRow key={note.id} note={note} depth={depth + 1} dnd={dnd} {...handlers} />
           ))}
         </div>
       )}
@@ -234,11 +411,12 @@ function FolderNode({
 function NoteRow({
   note,
   depth,
+  dnd,
   selectedNoteId,
   onSelectNote,
   onRenameNote,
   onDeleteNote,
-}: Handlers & { note: Note; depth: number }) {
+}: Handlers & { note: Note; depth: number; dnd: DndBundle }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(note.title);
 
@@ -253,12 +431,22 @@ function NoteRow({
   }
 
   const selected = note.id === selectedNoteId;
+  const isDragging = dnd.dragging?.kind === "note" && dnd.dragging.id === note.id;
+  const drop = dnd.dropTarget?.id === note.id ? dnd.dropTarget.zone : null;
 
   return (
     <div
+      draggable={!editing}
+      onDragStart={(e) => dnd.onDragStart(e, "note", note.id)}
+      onDragEnd={dnd.onDragEnd}
+      onDragOver={(e) => dnd.onNoteDragOver(e, note)}
+      onDragLeave={() => dnd.onDragLeave(note.id)}
+      onDrop={(e) => dnd.onNoteDrop(e, note)}
       style={{ paddingLeft: depth * 12 + 16 }}
       className={`group flex items-center gap-1 rounded px-1 py-1 ${
         selected ? "bg-zinc-200 dark:bg-zinc-800" : "hover:bg-zinc-200 dark:hover:bg-zinc-800"
+      } ${isDragging ? "opacity-40" : ""} ${drop === "before" ? "border-t-2 border-blue-500" : ""} ${
+        drop === "after" ? "border-b-2 border-blue-500" : ""
       }`}
     >
       {editing ? (

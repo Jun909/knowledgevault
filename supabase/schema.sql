@@ -18,6 +18,30 @@ create table if not exists notes (
 
 alter table notes add column if not exists last_edited_by text;
 
+-- Drag-and-drop ordering in the sidebar. Fractional so an item can be
+-- inserted between two neighbors without renumbering the whole list.
+alter table folders add column if not exists position double precision;
+alter table notes add column if not exists position double precision;
+
+with ranked as (
+  select id, row_number() over (partition by parent_id order by name) as rn
+  from folders
+)
+update folders set position = ranked.rn
+from ranked
+where folders.id = ranked.id and folders.position is null;
+
+with ranked as (
+  select id, row_number() over (partition by folder_id order by updated_at desc) as rn
+  from notes
+)
+update notes set position = ranked.rn
+from ranked
+where notes.id = ranked.id and notes.position is null;
+
+alter table folders alter column position set default 0;
+alter table notes alter column position set default 0;
+
 -- Base64-encoded Yjs doc snapshot (Y.encodeStateAsUpdate), used for live
 -- collaborative editing. Null until a note is first opened after this
 -- column was added, at which point it's seeded from `content`.
