@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Folder, Note } from "@/lib/types";
 import Sidebar from "./Sidebar";
@@ -17,10 +18,30 @@ export default function Workspace({
   userId: string;
   userEmail: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
+    searchParams.get("note")
+  );
   const [loading, setLoading] = useState(true);
+
+  const selectNote = useCallback(
+    (id: string | null) => {
+      setSelectedNoteId(id);
+      const params = new URLSearchParams(searchParams.toString());
+      if (id) {
+        params.set("note", id);
+      } else {
+        params.delete("note");
+      }
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   const loadData = useCallback(async () => {
     const [{ data: folderData }, { data: noteData }] = await Promise.all([
@@ -56,7 +77,7 @@ export default function Workspace({
     await supabase.from("folders").delete().eq("id", id);
     // Refetch: DB cascade may have removed nested subfolders/notes too.
     loadData();
-    setSelectedNoteId(null);
+    selectNote(null);
   }
 
   async function handleCreateNote(folderId: string | null) {
@@ -67,7 +88,7 @@ export default function Workspace({
       .single();
     if (!error && data) {
       setNotes((prev) => [data, ...prev]);
-      setSelectedNoteId(data.id);
+      selectNote(data.id);
     }
   }
 
@@ -78,7 +99,7 @@ export default function Workspace({
 
   async function handleDeleteNote(id: string) {
     setNotes((prev) => prev.filter((n) => n.id !== id));
-    if (selectedNoteId === id) setSelectedNoteId(null);
+    if (selectedNoteId === id) selectNote(null);
     await supabase.from("notes").delete().eq("id", id);
   }
 
@@ -88,6 +109,13 @@ export default function Workspace({
   }
 
   const selectedNote = notes.find((n) => n.id === selectedNoteId) ?? null;
+
+  useEffect(() => {
+    if (!loading && selectedNoteId && !selectedNote) {
+      // Stale/bookmarked link to a note that no longer exists: strip it from the URL.
+      router.replace(pathname, { scroll: false });
+    }
+  }, [loading, selectedNoteId, selectedNote, pathname, router]);
 
   if (loading) {
     return (
@@ -103,7 +131,7 @@ export default function Workspace({
         folders={folders}
         notes={notes}
         selectedNoteId={selectedNoteId}
-        onSelectNote={setSelectedNoteId}
+        onSelectNote={selectNote}
         onCreateFolder={handleCreateFolder}
         onRenameFolder={handleRenameFolder}
         onDeleteFolder={handleDeleteFolder}
