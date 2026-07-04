@@ -32,12 +32,14 @@ export default function NoteEditor({
   const [title, setTitle] = useState(note.title);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [lastEditedBy, setLastEditedBy] = useState(note.last_edited_by);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setTitle(note.title);
     setLastEditedBy(note.last_edited_by);
     setSavedAt(null);
+    setSaveError(null);
     editor.replaceBlocks(editor.document, asBlocks(note.content));
     // Only re-sync when switching to a different note.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,7 +49,7 @@ export default function NoteEditor({
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(async () => {
       const updatedAt = new Date().toISOString();
-      await supabase
+      const { error } = await supabase
         .from("notes")
         .update({
           content: blocks,
@@ -56,6 +58,13 @@ export default function NoteEditor({
           updated_at: updatedAt,
         })
         .eq("id", note.id);
+
+      if (error) {
+        setSaveError(error.message);
+        return;
+      }
+
+      setSaveError(null);
       setSavedAt(new Date());
       setLastEditedBy(userEmail);
       onSaved({ lastEditedBy: userEmail, updatedAt });
@@ -75,12 +84,18 @@ export default function NoteEditor({
           placeholder="Untitled"
           className="w-full bg-transparent text-2xl font-semibold text-zinc-900 outline-none dark:text-zinc-50"
         />
-        {(lastEditedBy || savedAt) && (
-          <p className="mt-1 text-xs text-zinc-400">
-            {lastEditedBy && <>Last edited by {lastEditedBy}</>}
-            {lastEditedBy && savedAt && " · "}
-            {savedAt && <>Saved {savedAt.toLocaleTimeString()}</>}
+        {saveError ? (
+          <p className="mt-1 text-xs text-red-600">
+            Failed to save: {saveError}
           </p>
+        ) : (
+          (lastEditedBy || savedAt) && (
+            <p className="mt-1 text-xs text-zinc-400">
+              {lastEditedBy && <>Last edited by {lastEditedBy}</>}
+              {lastEditedBy && savedAt && " · "}
+              {savedAt && <>Saved {savedAt.toLocaleTimeString()}</>}
+            </p>
+          )
         )}
       </div>
       <div className="flex-1 px-2 py-4">
