@@ -34,6 +34,18 @@ export function useNoteCollaboration({
     const channel = supabase.channel(`note-${noteId}`);
     let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
+    // channel.send() silently (and, per a recent supabase-js deprecation
+    // warning, no longer silently) falls back to REST when the websocket
+    // hasn't finished joining yet — e.g. the very first awareness/doc update
+    // right after mount. Route explicitly instead of relying on that fallback.
+    function sendBroadcast(event: string, payload: Record<string, unknown>) {
+      if (channel.state === "joined") {
+        channel.send({ type: "broadcast", event, payload });
+      } else {
+        channel.httpSend(event, payload);
+      }
+    }
+
     function scheduleSave() {
       if (saveTimeout) clearTimeout(saveTimeout);
       saveTimeout = setTimeout(async () => {
@@ -56,11 +68,7 @@ export function useNoteCollaboration({
 
     function handleDocUpdate(update: Uint8Array, origin: unknown) {
       if (origin === REMOTE) return;
-      channel.send({
-        type: "broadcast",
-        event: "yjs-update",
-        payload: { update: bytesToBase64(update) },
-      });
+      sendBroadcast("yjs-update", { update: bytesToBase64(update) });
       scheduleSave();
     }
 
@@ -74,10 +82,8 @@ export function useNoteCollaboration({
       removed: number[];
     }) {
       const changed = added.concat(updated, removed);
-      channel.send({
-        type: "broadcast",
-        event: "awareness-update",
-        payload: { update: bytesToBase64(encodeAwarenessUpdate(awareness, changed)) },
+      sendBroadcast("awareness-update", {
+        update: bytesToBase64(encodeAwarenessUpdate(awareness, changed)),
       });
     }
 
@@ -92,15 +98,11 @@ export function useNoteCollaboration({
         applyAwarenessUpdate(awareness, base64ToBytes(payload.update), REMOTE);
       })
       .on("broadcast", { event: "sync-request" }, () => {
-        channel.send({
-          type: "broadcast",
-          event: "yjs-update",
-          payload: { update: bytesToBase64(Y.encodeStateAsUpdate(doc)) },
-        });
+        sendBroadcast("yjs-update", { update: bytesToBase64(Y.encodeStateAsUpdate(doc)) });
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          channel.send({ type: "broadcast", event: "sync-request", payload: {} });
+          sendBroadcast("sync-request", {});
         }
       });
 

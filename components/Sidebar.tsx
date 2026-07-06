@@ -182,7 +182,7 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
         <button
           title="Open sidebar"
           onClick={() => setMobileOpen(true)}
-          className="fixed left-3 top-3 z-30 rounded bg-zinc-50 p-2 text-lg leading-none text-zinc-600 shadow dark:bg-zinc-900 dark:text-zinc-400 sm:hidden"
+          className="fixed left-3 top-3 z-30 rounded-lg bg-zinc-50 p-2 text-lg leading-none text-zinc-600 shadow-md shadow-zinc-900/10 transition-colors hover:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-black/20 dark:hover:bg-zinc-800 sm:hidden"
         >
           ☰
         </button>
@@ -194,7 +194,7 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-zinc-200 bg-zinc-50 transition-transform duration-200 dark:border-zinc-800 dark:bg-zinc-950 sm:static sm:z-auto sm:shrink-0 sm:translate-x-0 sm:transition-[width] ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-zinc-200/70 bg-zinc-50 transition-transform duration-200 dark:border-zinc-800/70 dark:bg-zinc-950 sm:static sm:z-auto sm:shrink-0 sm:translate-x-0 sm:transition-[width] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "sm:w-10" : "sm:w-72"}`}
       >
@@ -203,35 +203,48 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
             <button
               title="Expand sidebar"
               onClick={() => setCollapsed(false)}
-              className="rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              className="rounded-md px-1 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-500 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
             >
               »
             </button>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-zinc-200 p-3 dark:border-zinc-800">
-              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+            <div className="flex items-center justify-between border-b border-zinc-200/70 p-3 dark:border-zinc-800/70">
+              <span className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500"
+                >
+                  <rect x="4" y="10" width="16" height="10" rx="2" />
+                  <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                </svg>
                 Notes
               </span>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => handlers.onCreateFolder(null)}
-                  className="rounded px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  className="rounded-md px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
                 >
                   + Folder
                 </button>
                 <button
                   title="Collapse sidebar"
                   onClick={() => setCollapsed(true)}
-                  className="hidden rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 sm:inline-flex"
+                  className="hidden rounded-md px-1.5 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-500 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100 sm:inline-flex"
                 >
                   «
                 </button>
                 <button
                   title="Close sidebar"
                   onClick={() => setMobileOpen(false)}
-                  className="rounded px-1 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 sm:hidden"
+                  className="rounded-md px-1.5 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-500 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100 sm:hidden"
                 >
                   ✕
                 </button>
@@ -274,7 +287,7 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
               ))}
               <button
                 onClick={() => handlers.onCreateNote(null)}
-                className="mt-1 w-full rounded px-2 py-1 text-left text-xs text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-500 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
               >
                 + New note
               </button>
@@ -323,7 +336,7 @@ function FolderNode({
         onDragOver={(e) => dnd.onFolderDragOver(e, folder)}
         onDragLeave={() => dnd.onDragLeave(folder.id)}
         onDrop={(e) => dnd.onFolderDrop(e, folder)}
-        className={`group flex items-center gap-1 rounded px-1 py-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 ${
+        className={`group flex items-center gap-1 rounded-md px-1 py-1 transition-colors hover:bg-zinc-200/70 dark:hover:bg-zinc-800/70 ${
           isDragging ? "opacity-40" : ""
         } ${drop === "inside" ? "bg-blue-100 dark:bg-blue-900/40" : ""} ${
           drop === "before" ? "border-t-2 border-blue-500" : ""
@@ -331,7 +344,7 @@ function FolderNode({
       >
         <button
           onClick={() => setOpen(!open)}
-          className="w-4 shrink-0 text-xs text-zinc-500"
+          className="w-4 shrink-0 text-xs text-zinc-400 dark:text-zinc-500"
         >
           {open ? "▾" : "▸"}
         </button>
@@ -348,7 +361,7 @@ function FolderNode({
                 setEditing(false);
               }
             }}
-            className="flex-1 rounded border border-zinc-300 bg-white px-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="flex-1 rounded-md border border-zinc-300 bg-white px-1 text-sm outline-none focus:ring-2 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:ring-zinc-50"
           />
         ) : (
           <span
@@ -358,18 +371,18 @@ function FolderNode({
             📁 {folder.name}
           </span>
         )}
-        <div className="flex shrink-0 gap-1 sm:hidden sm:group-hover:flex">
+        <div className="flex shrink-0 gap-1.5 sm:hidden sm:group-hover:flex">
           <button
             title="New note"
             onClick={() => handlers.onCreateNote(folder.id)}
-            className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            className="text-xs text-zinc-400 transition-colors hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-100"
           >
             📝
           </button>
           <button
             title="New subfolder"
             onClick={() => handlers.onCreateFolder(folder.id)}
-            className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            className="text-xs text-zinc-400 transition-colors hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-100"
           >
             📁+
           </button>
@@ -380,7 +393,7 @@ function FolderNode({
                 handlers.onDeleteFolder(folder.id);
               }
             }}
-            className="text-xs text-zinc-500 hover:text-red-600"
+            className="text-xs text-zinc-400 transition-colors hover:text-red-600 dark:text-zinc-500"
           >
             🗑
           </button>
@@ -443,8 +456,10 @@ function NoteRow({
       onDragLeave={() => dnd.onDragLeave(note.id)}
       onDrop={(e) => dnd.onNoteDrop(e, note)}
       style={{ paddingLeft: depth * 12 + 16 }}
-      className={`group flex items-center gap-1 rounded px-1 py-1 ${
-        selected ? "bg-zinc-200 dark:bg-zinc-800" : "hover:bg-zinc-200 dark:hover:bg-zinc-800"
+      className={`group flex items-center gap-1 rounded-md px-1 py-1 transition-colors ${
+        selected
+          ? "bg-zinc-200/80 shadow-[inset_2px_0_0_0_theme(colors.zinc.900)] dark:bg-zinc-800/80 dark:shadow-[inset_2px_0_0_0_theme(colors.zinc.50)]"
+          : "hover:bg-zinc-200/70 dark:hover:bg-zinc-800/70"
       } ${isDragging ? "opacity-40" : ""} ${drop === "before" ? "border-t-2 border-blue-500" : ""} ${
         drop === "after" ? "border-b-2 border-blue-500" : ""
       }`}
@@ -462,7 +477,7 @@ function NoteRow({
               setEditing(false);
             }
           }}
-          className="flex-1 rounded border border-zinc-300 bg-white px-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 rounded-md border border-zinc-300 bg-white px-1 text-sm outline-none focus:ring-2 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:ring-zinc-50"
         />
       ) : (
         <button
@@ -478,7 +493,7 @@ function NoteRow({
         onClick={() => {
           if (confirm(`Delete "${note.title}"?`)) onDeleteNote(note.id);
         }}
-        className="block shrink-0 text-xs text-zinc-500 hover:text-red-600 sm:hidden sm:group-hover:block"
+        className="block shrink-0 text-xs text-zinc-400 transition-colors hover:text-red-600 dark:text-zinc-500 sm:hidden sm:group-hover:block"
       >
         🗑
       </button>

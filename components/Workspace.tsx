@@ -215,8 +215,8 @@ export default function Workspace({
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-zinc-500">
-        Loading...
+      <div className="flex h-screen items-center justify-center bg-zinc-50 text-sm text-zinc-400 dark:bg-zinc-950 dark:text-zinc-600">
+        <span className="animate-pulse">Loading...</span>
       </div>
     );
   }
@@ -238,12 +238,12 @@ export default function Workspace({
         onMoveNote={handleMoveNote}
       />
       <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-end gap-3 border-b border-zinc-200 px-4 py-2 text-xs text-zinc-500 dark:border-zinc-800">
+        <div className="flex items-center justify-end gap-2 border-b border-zinc-200/70 bg-zinc-50/80 px-4 py-2 backdrop-blur-sm dark:border-zinc-800/70 dark:bg-zinc-950/80">
           <ThemeToggle />
-          <span>{userEmail}</span>
+          <span className="px-1 text-xs text-zinc-500 dark:text-zinc-400">{userEmail}</span>
           <button
             onClick={handleSignOut}
-            className="hover:text-zinc-900 dark:hover:text-zinc-100"
+            className="rounded-md px-2 py-1 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
           >
             Sign out
           </button>
@@ -269,7 +269,19 @@ export default function Workspace({
             }
           />
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-zinc-400 dark:text-zinc-600">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-8 w-8 opacity-60"
+            >
+              <path d="M9 2H15a2 2 0 0 1 2 2v16l-5-3-5 3V4a2 2 0 0 1 2-2Z" />
+            </svg>
             Select or create a note
           </div>
         )}

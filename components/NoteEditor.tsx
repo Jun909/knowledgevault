@@ -53,8 +53,8 @@ export default function NoteEditor({
 
   if (!doc) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">
-        Loading note…
+      <div className="flex flex-1 items-center justify-center text-sm text-zinc-400 dark:text-zinc-600">
+        <span className="animate-pulse">Loading note…</span>
       </div>
     );
   }
@@ -136,7 +136,7 @@ function NoteEditorBody({
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-y-auto">
-      <div className="border-b border-zinc-200 p-4 dark:border-zinc-800">
+      <div className="border-b border-zinc-200/70 px-6 py-5 dark:border-zinc-800/70">
         <input
           value={title}
           onChange={(e) => {
@@ -145,15 +145,15 @@ function NoteEditorBody({
             scheduleTitleSave(e.target.value);
           }}
           placeholder="Untitled"
-          className="w-full bg-transparent text-2xl font-semibold text-zinc-900 outline-none dark:text-zinc-50"
+          className="w-full bg-transparent text-2xl font-semibold tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300 dark:text-zinc-50 dark:placeholder:text-zinc-700"
         />
         {saveError ? (
-          <p className="mt-1 text-xs text-red-600">
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
             Failed to save: {saveError}
           </p>
         ) : (
           (lastEditedBy || savedAt) && (
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1.5 text-xs text-zinc-400 dark:text-zinc-500">
               {lastEditedBy && <>Last edited by {lastEditedBy}</>}
               {lastEditedBy && savedAt && " · "}
               {savedAt && <>Saved {savedAt.toLocaleTimeString()}</>}
