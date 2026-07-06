@@ -56,11 +56,49 @@ function getDropZone(e: React.DragEvent, allowInside: boolean): DropZone {
   return ratio < 0.5 ? "before" : "after";
 }
 
+const MIN_SIDEBAR_WIDTH = 220;
+const MAX_SIDEBAR_WIDTH = 480;
+const DEFAULT_SIDEBAR_WIDTH = 288;
+const SIDEBAR_WIDTH_KEY = "sidebar-width";
+
+function readStoredWidth(): number {
+  if (typeof window === "undefined") return DEFAULT_SIDEBAR_WIDTH;
+  const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+  return saved >= MIN_SIDEBAR_WIDTH && saved <= MAX_SIDEBAR_WIDTH ? saved : DEFAULT_SIDEBAR_WIDTH;
+}
+
 export default function Sidebar({ folders, notes, ...handlers }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dragging, setDragging] = useState<{ kind: "folder" | "note"; id: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; zone: DropZone } | null>(null);
+  const [width, setWidth] = useState(readStoredWidth);
+  const [resizing, setResizing] = useState(false);
+
+  function startResize(e: React.PointerEvent) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+    let latest = startWidth;
+    setResizing(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    function onMove(ev: PointerEvent) {
+      latest = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, startWidth + (ev.clientX - startX)));
+      setWidth(latest);
+    }
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setResizing(false);
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(latest));
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 
   const rootFolders = folders.filter((f) => f.parent_id === null).sort((a, b) => a.position - b.position);
   const rootNotes = notes.filter((n) => n.folder_id === null).sort((a, b) => a.position - b.position);
@@ -194,10 +232,25 @@ export default function Sidebar({ folders, notes, ...handlers }: Props) {
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-zinc-200/70 bg-zinc-50 transition-transform duration-200 dark:border-zinc-800/70 dark:bg-zinc-950 sm:static sm:z-auto sm:shrink-0 sm:translate-x-0 sm:transition-[width] ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        } ${collapsed ? "sm:w-10" : "sm:w-72"}`}
+        suppressHydrationWarning
+        style={{ "--sidebar-width": `${width}px` } as React.CSSProperties}
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-zinc-200/70 bg-zinc-50 duration-200 dark:border-zinc-800/70 dark:bg-zinc-950 sm:static sm:relative sm:z-auto sm:shrink-0 sm:translate-x-0 ${
+          resizing ? "" : "transition-transform sm:transition-[width]"
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${
+          collapsed ? "sm:w-10" : "sm:w-[var(--sidebar-width)]"
+        }`}
       >
+        {!collapsed && (
+          <div
+            onPointerDown={startResize}
+            role="separator"
+            aria-orientation="vertical"
+            title="Drag to resize"
+            className={`absolute inset-y-0 -right-1 z-10 hidden w-2 cursor-col-resize touch-none sm:block ${
+              resizing ? "bg-zinc-400/50 dark:bg-zinc-600/50" : "hover:bg-zinc-300/50 dark:hover:bg-zinc-700/50"
+            }`}
+          />
+        )}
         {collapsed ? (
           <div className="hidden sm:flex sm:flex-col sm:items-center sm:py-3">
             <button
